@@ -166,10 +166,14 @@ dump/
 # Redis dump files
 dump.rdb
 
-# Application specific files
-check-db.js
-fix-db.js
-check-admin.js
+# Development utility scripts
+check-*.js
+fix-*.js
+test-*.js
+debug-*.js
+*-test.js
+*-debug.js
+*.txt
 
 # Backup files
 *.bak
