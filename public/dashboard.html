@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Employee Experience Tracker</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <nav class="nav">
+            <div class="nav-brand">Employee Tracker</div>
+            <div class="nav-links">
+                <span id="userInfo" class="user-info"></span>
+                <button class="btn btn-danger" onclick="logout()">Logout</button>
+            </div>
+        </nav>
+
+        <div class="dashboard-header">
+            <h1 id="dashboardTitle">Dashboard</h1>
+        </div>
+
+        <!-- Employee Dashboard -->
+        <div id="employeeDashboard" class="hidden">
+            <div class="experience-summary">
+                <div class="experience-card">
+                    <h4>Current Experience</h4>
+                    <div class="experience-value" id="currentExp">-</div>
+                </div>
+                <div class="experience-card">
+                    <h4>Previous Experience</h4>
+                    <div class="experience-value" id="previousExp">-</div>
+                </div>
+                <div class="experience-card">
+                    <h4>Total Experience</h4>
+                    <div class="experience-value" id="totalExp">-</div>
+                </div>
+                <div class="experience-card">
+                    <h4>Age</h4>
+                    <div class="experience-value" id="age">-</div>
+                </div>
+            </div>            <div class="employee-details">
+                <div class="detail-section">
+                    <h3>Personal Information</h3>
+                    <div class="text-center mb-2">
+                        <div id="empPhoto"></div>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Full Name</span>
+                        <span class="detail-value" id="empFullName">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Employee ID</span>
+                        <span class="detail-value" id="empId">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Email</span>
+                        <span class="detail-value" id="empEmail">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Designation</span>
+                        <span class="detail-value" id="empDesignation">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Date of Birth</span>
+                        <span class="detail-value" id="empDOB">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Date of Joining</span>
+                        <span class="detail-value" id="empDOJ">-</span>
+                    </div>
+                </div>
+
+                <div class="detail-section">
+                    <h3>Educational Qualifications</h3>
+                    <div class="detail-item">
+                        <span class="detail-label">UG Qualification</span>
+                        <span class="detail-value" id="empUG">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">PG Qualification</span>
+                        <span class="detail-value" id="empPG">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">PhD Qualification</span>
+                        <span class="detail-value" id="empPhD">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="previous-experience">
+                <h3>Previous Experience</h3>
+                <div id="previousExperienceList">
+                    <!-- Previous experience items will be loaded here -->
+                </div>
+            </div>
+
+            <div class="text-center mt-2">
+                <button class="btn btn-primary" onclick="editEmployee()">Edit Profile</button>
+            </div>
+        </div>
+
+        <!-- Admin Dashboard -->
+        <div id="adminDashboard" class="hidden">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">All Employees</h2>
+                </div>                <div class="table-container">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Employee ID</th>
+                                <th>Full Name</th>
+                                <th>Email</th>
+                                <th>Designation</th>
+                                <th>Age</th>
+                                <th>Current Experience</th>
+                                <th>Total Experience</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="employeeTableBody">
+                            <!-- Employee rows will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Employee Details Modal -->
+        <div id="employeeModal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="modalTitle">Employee Details</h2>
+                    <button class="btn btn-secondary" onclick="closeModal()">Close</button>
+                </div>
+                <div id="modalBody">
+                    <!-- Employee details will be loaded here -->
+                </div>
+            </div>
+        </div>
+
+        <div id="loading" class="loading hidden">
+            <p>Loading...</p>
+        </div>
+    </div>
+
+    <script src="/js/dashboard.js"></script>
+</body>
+</html>

@@ -1,132 +1,197 @@
 const mongoose = require('mongoose');
 const moment = require('moment');
 
-const employeeSchema = new mongoose.Schema({
-  employeeId: {
-    type: String,
-    required: true,
-    unique: true,
-    trim: true
-  },
-  fullName: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  designation: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  qualifications: {
-    ug: {
-      type: String,
-      trim: true
+const previousExperienceSchema = new mongoose.Schema({
+    organization: {
+        type: String,
+        required: true
     },
-    pg: {
-      type: String,
-      trim: true
+    fromDate: {
+        type: Date,
+        required: true
     },
-    phd: {
-      type: String,
-      trim: true
-    }
-  },
-  dateOfBirth: {
-    type: Date,
-    required: true
-  },
-  dateOfJoining: {
-    type: Date,
-    required: true
-  },
-  previousExperience: {
+    toDate: {
+        type: Date,
+        required: true
+    },
     years: {
-      type: Number,
-      default: 0,
-      min: 0
+        type: Number,
+        default: 0
     },
     months: {
-      type: Number,
-      default: 0,
-      min: 0,
-      max: 11
+        type: Number,
+        default: 0
     },
     days: {
-      type: Number,
-      default: 0,
-      min: 0,
-      max: 30
+        type: Number,
+        default: 0
     }
-  },
-  createdBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  }
+});
+
+const employeeSchema = new mongoose.Schema({    employeeId: {
+        type: String,
+        required: true,
+        unique: true
+    },
+    email: {
+        type: String,
+        required: true,
+        unique: true,
+        lowercase: true,
+        trim: true
+    },
+    password: {
+        type: String,
+        required: true
+    },
+    fullName: {
+        type: String,
+        required: true
+    },
+    profilePhoto: {
+        type: String,
+        default: null
+    },
+    designation: {
+        type: String,
+        required: true
+    },
+    ugQualification: {
+        type: String,
+        required: false
+    },
+    pgQualification: {
+        type: String,
+        required: false
+    },
+    phdQualification: {
+        type: String,
+        required: false
+    },
+    dateOfBirth: {
+        type: Date,
+        required: true
+    },
+    dateOfJoining: {
+        type: Date,
+        required: true
+    },
+    previousExperience: [previousExperienceSchema],
+    // Auto-calculated fields
+    age: {
+        years: { type: Number, default: 0 },
+        months: { type: Number, default: 0 },
+        days: { type: Number, default: 0 }
+    },
+    currentExperience: {
+        years: { type: Number, default: 0 },
+        months: { type: Number, default: 0 },
+        days: { type: Number, default: 0 }
+    },
+    totalPreviousExperience: {
+        years: { type: Number, default: 0 },
+        months: { type: Number, default: 0 },
+        days: { type: Number, default: 0 }
+    },
+    totalExperience: {
+        years: { type: Number, default: 0 },
+        months: { type: Number, default: 0 },
+        days: { type: Number, default: 0 }
+    }
 }, {
-  timestamps: true
+    timestamps: true
 });
 
-// Virtual for age calculation
-employeeSchema.virtual('age').get(function() {
-  return moment().diff(this.dateOfBirth, 'years');
+// Helper function to calculate duration between two dates
+function calculateDuration(startDate, endDate) {
+    const start = moment(startDate);
+    const end = moment(endDate);
+    
+    const years = end.diff(start, 'years');
+    start.add(years, 'years');
+    
+    const months = end.diff(start, 'months');
+    start.add(months, 'months');
+    
+    const days = end.diff(start, 'days');
+    
+    return { years, months, days };
+}
+
+// Helper function to add durations
+function addDurations(duration1, duration2) {
+    let totalDays = duration1.days + duration2.days;
+    let totalMonths = duration1.months + duration2.months;
+    let totalYears = duration1.years + duration2.years;
+    
+    if (totalDays >= 30) {
+        totalMonths += Math.floor(totalDays / 30);
+        totalDays = totalDays % 30;
+    }
+    
+    if (totalMonths >= 12) {
+        totalYears += Math.floor(totalMonths / 12);
+        totalMonths = totalMonths % 12;
+    }
+    
+    return { years: totalYears, months: totalMonths, days: totalDays };
+}
+
+// Pre-save middleware to calculate all experience fields
+employeeSchema.pre('save', function(next) {
+    // Calculate age
+    this.age = calculateDuration(this.dateOfBirth, new Date());
+    
+    // Calculate current experience
+    this.currentExperience = calculateDuration(this.dateOfJoining, new Date());
+    
+    // Calculate individual previous experience durations
+    this.previousExperience.forEach(exp => {
+        const duration = calculateDuration(exp.fromDate, exp.toDate);
+        exp.years = duration.years;
+        exp.months = duration.months;
+        exp.days = duration.days;
+    });
+    
+    // Calculate total previous experience
+    let totalPrevious = { years: 0, months: 0, days: 0 };
+    this.previousExperience.forEach(exp => {
+        totalPrevious = addDurations(totalPrevious, {
+            years: exp.years,
+            months: exp.months,
+            days: exp.days
+        });
+    });
+    this.totalPreviousExperience = totalPrevious;
+    
+    // Calculate total experience (current + previous)
+    this.totalExperience = addDurations(this.currentExperience, this.totalPreviousExperience);
+    
+    next();
 });
 
-// Virtual for current experience calculation
-employeeSchema.virtual('currentExperience').get(function() {
-  const now = moment();
-  const joining = moment(this.dateOfJoining);
-  
-  const totalDays = now.diff(joining, 'days');
-  
-  const years = Math.floor(totalDays / 365);
-  const remainingDaysAfterYears = totalDays % 365;
-  const months = Math.floor(remainingDaysAfterYears / 30);
-  const days = remainingDaysAfterYears % 30;
-  
-  return {
-    years: years,
-    months: months,
-    days: days
-  };
-});
-
-// Virtual for total experience calculation
-employeeSchema.virtual('totalExperience').get(function() {
-  const current = this.currentExperience;
-  const previous = this.previousExperience;
-  
-  let totalDays = previous.days + current.days;
-  let totalMonths = previous.months + current.months;
-  let totalYears = previous.years + current.years;
-  
-  // Handle day overflow
-  if (totalDays >= 30) {
-    totalMonths += Math.floor(totalDays / 30);
-    totalDays = totalDays % 30;
-  }
-  
-  // Handle month overflow
-  if (totalMonths >= 12) {
-    totalYears += Math.floor(totalMonths / 12);
-    totalMonths = totalMonths % 12;
-  }
-  
-  return {
-    years: totalYears,
-    months: totalMonths,
-    days: totalDays
-  };
-});
-
-// Include virtuals when converting to JSON
-employeeSchema.set('toJSON', { virtuals: true });
-employeeSchema.set('toObject', { virtuals: true });
-
-// Index for faster queries
-employeeSchema.index({ employeeId: 1 });
-employeeSchema.index({ fullName: 1 });
-employeeSchema.index({ dateOfJoining: 1 });
+// Method to recalculate experience (for real-time updates)
+employeeSchema.methods.recalculateExperience = function() {
+    this.age = calculateDuration(this.dateOfBirth, new Date());
+    this.currentExperience = calculateDuration(this.dateOfJoining, new Date());
+    
+    let totalPrevious = { years: 0, months: 0, days: 0 };
+    this.previousExperience.forEach(exp => {
+        const duration = calculateDuration(exp.fromDate, exp.toDate);
+        exp.years = duration.years;
+        exp.months = duration.months;
+        exp.days = duration.days;
+        
+        totalPrevious = addDurations(totalPrevious, {
+            years: exp.years,
+            months: exp.months,
+            days: exp.days
+        });
+    });
+    this.totalPreviousExperience = totalPrevious;
+    this.totalExperience = addDurations(this.currentExperience, this.totalPreviousExperience);
+    
+    return this;
+};
 
 module.exports = mongoose.model('Employee', employeeSchema);

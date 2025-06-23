@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Employee Experience Tracker</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <nav class="nav">
+            <div class="nav-brand">Employee Tracker</div>
+            <ul class="nav-links">
+                <li><a href="/">Home</a></li>
+                <li><a href="/register">Register</a></li>
+            </ul>
+        </nav>
+
+        <div class="login-container">
+            <div class="card fade-in">
+                <div class="card-header text-center">
+                    <h1 class="card-title">Login</h1>
+                </div>
+
+                <div class="login-tabs">
+                    <button class="login-tab active" onclick="showTab('employee')">Employee Login</button>
+                    <button class="login-tab" onclick="showTab('admin')">Admin Login</button>
+                </div>                <!-- Employee Login Form -->
+                <form id="employeeLoginForm" class="login-form active">
+                    <div class="form-group">
+                        <label class="form-label">Email Address</label>
+                        <input type="email" id="employeeEmail" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Password</label>
+                        <input type="password" id="employeePassword" class="form-control" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">Login as Employee</button>
+                </form>
+
+                <!-- Admin Login Form -->
+                <form id="adminLoginForm" class="login-form">
+                    <div class="form-group">
+                        <label class="form-label">Admin Username</label>
+                        <input type="text" id="adminUsername" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Admin Password</label>
+                        <input type="password" id="adminPassword" class="form-control" required>
+                    </div>
+                    <button type="submit" class="btn btn-success" style="width: 100%;">Login as Admin</button>
+                </form>
+
+                <div id="message" class="mt-2 text-center"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/login.js"></script>
+</body>
+</html>

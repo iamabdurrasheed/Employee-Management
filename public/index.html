@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Employee Experience Tracker</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="home-hero fade-in">
+            <h1>Employee Experience Tracker</h1>
+            <p>Comprehensive employee management system with automatic experience calculations</p>
+        </div>
+
+        <div class="home-actions">
+            <div class="action-card fade-in">
+                <h3>Employee Login</h3>
+                <p>Access your personal dashboard and view your experience details</p>
+                <a href="/login?type=employee" class="btn btn-primary">Employee Login</a>
+            </div>
+
+            <div class="action-card fade-in">
+                <h3>Admin Login</h3>
+                <p>Manage all employees and access administrative features</p>
+                <a href="/login?type=admin" class="btn btn-success">Admin Login</a>
+            </div>
+
+            <div class="action-card fade-in">
+                <h3>New Employee Registration</h3>
+                <p>Register a new employee with detailed information and experience</p>
+                <a href="/register" class="btn btn-warning">Register Employee</a>
+            </div>
+        </div>
+        <br>
+        <br>
+
+        <div class="card fade-in">
+            <div class="card-header">
+                <h2 class="card-title">Features</h2>
+            </div>
+            <div class="employee-details">
+                <div class="detail-section">
+                    <h3>🎯 Experience Tracking</h3>
+                    <ul style="list-style: none; padding: 0;">
+                        <li class="detail-item">
+                            <span class="detail-label">Current Experience</span>
+                            <span class="detail-value">Auto-calculated from joining date</span>
+                        </li>
+                        <li class="detail-item">
+                            <span class="detail-label">Previous Experience</span>
+                            <span class="detail-value">Manual entry with organization details</span>
+                        </li>
+                        <li class="detail-item">
+                            <span class="detail-label">Total Experience</span>
+                            <span class="detail-value">Automatic summation in Years, Months, Days</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="detail-section">
+                    <h3>👤 Employee Information</h3>
+                    <ul style="list-style: none; padding: 0;">
+                        <li class="detail-item">
+                            <span class="detail-label">Personal Details</span>
+                            <span class="detail-value">Full name, DOB, Age calculation</span>
+                        </li>
+                        <li class="detail-item">
+                            <span class="detail-label">Qualifications</span>
+                            <span class="detail-value">UG, PG, PhD details</span>
+                        </li>
+                        <li class="detail-item">
+                            <span class="detail-label">Professional Info</span>
+                            <span class="detail-value">Designation, Employee ID</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="detail-section">
+                    <h3>🔐 Security & Access</h3>
+                    <ul style="list-style: none; padding: 0;">
+                        <li class="detail-item">
+                            <span class="detail-label">Employee Access</span>
+                            <span class="detail-value">View own details only</span>
+                        </li>
+                        <li class="detail-item">
+                            <span class="detail-label">Admin Access</span>
+                            <span class="detail-value">Full employee management</span>
+                        </li>
+                        <li class="detail-item">
+                            <span class="detail-label">Real-time Updates</span>
+                            <span class="detail-value">Experience recalculated on access</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

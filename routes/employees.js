@@ -1,297 +1,202 @@
 const express = require('express');
-const { body, validationResult } = require('express-validator');
 const Employee = require('../models/Employee');
-const { auth } = require('../middleware/auth');
-
+const jwt = require('jsonwebtoken');
 const router = express.Router();
 
-// @route   GET /api/employees
-// @desc    Get all employees
-// @access  Private
+// Middleware to verify JWT token
+const auth = (req, res, next) => {
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    
+    if (!token) {
+        return res.status(401).json({ message: 'No token, authorization denied' });
+    }
+
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        req.user = decoded;
+        next();
+    } catch (error) {
+        res.status(401).json({ message: 'Token is not valid' });
+    }
+};
+
+// Get all employees (Admin only)
 router.get('/', auth, async (req, res) => {
-  try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
+    try {
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ message: 'Access denied' });
+        }
 
-    const search = req.query.search || '';
-    const sortBy = req.query.sortBy || 'createdAt';
-    const sortOrder = req.query.sortOrder === 'asc' ? 1 : -1;
+        const employees = await Employee.find().select('-password');
+        
+        // Recalculate experience for all employees for real-time data
+        const updatedEmployees = await Promise.all(
+            employees.map(async (emp) => {
+                emp.recalculateExperience();
+                await emp.save();
+                return emp;
+            })
+        );
 
-    let query = {};
-    if (search) {
-      query = {
-        $or: [
-          { fullName: { $regex: search, $options: 'i' } },
-          { employeeId: { $regex: search, $options: 'i' } },
-          { designation: { $regex: search, $options: 'i' } }
-        ]
-      };
+        res.json(updatedEmployees);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
     }
-
-    const employees = await Employee.find(query)
-      .sort({ [sortBy]: sortOrder })
-      .skip(skip)
-      .limit(limit)
-      .populate('createdBy', 'username')
-      .lean();
-
-    // Add calculated fields to each employee
-    const employeesWithCalculations = employees.map(emp => {
-      const employee = new Employee(emp);
-      return {
-        ...emp,
-        age: employee.age,
-        currentExperience: employee.currentExperience,
-        totalExperience: employee.totalExperience
-      };
-    });
-
-    const total = await Employee.countDocuments(query);
-
-    res.json({
-      employees: employeesWithCalculations,
-      totalPages: Math.ceil(total / limit),
-      currentPage: page,
-      total
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
-  }
 });
 
-// @route   GET /api/employees/:id
-// @desc    Get employee by ID
-// @access  Private
+// Get single employee (Employee can only view their own data)
 router.get('/:id', auth, async (req, res) => {
-  try {
-    const employee = await Employee.findById(req.params.id)
-      .populate('createdBy', 'username');
+    try {
+        let employee;
+        
+        if (req.user.role === 'admin') {
+            employee = await Employee.findById(req.params.id).select('-password');        } else {
+            // Employee can only view their own data
+            employee = await Employee.findOne({ 
+                _id: req.params.id, 
+                email: req.user.email 
+            }).select('-password');
+        }
 
-    if (!employee) {
-      return res.status(404).json({ message: 'Employee not found' });
-    }
+        if (!employee) {
+            return res.status(404).json({ message: 'Employee not found' });
+        }
 
-    res.json(employee);
-  } catch (error) {
-    console.error(error);
-    if (error.kind === 'ObjectId') {
-      return res.status(404).json({ message: 'Employee not found' });
+        // Recalculate experience for real-time data
+        employee.recalculateExperience();
+        await employee.save();
+
+        res.json(employee);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
     }
-    res.status(500).json({ message: 'Server error' });
-  }
 });
 
-// @route   POST /api/employees
-// @desc    Create new employee
-// @access  Private
-router.post('/', [
-  auth,
-  body('employeeId').notEmpty().withMessage('Employee ID is required'),
-  body('fullName').notEmpty().withMessage('Full name is required'),
-  body('designation').notEmpty().withMessage('Designation is required'),
-  body('dateOfBirth').isISO8601().withMessage('Valid date of birth is required'),
-  body('dateOfJoining').isISO8601().withMessage('Valid date of joining is required')
-], async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
+// Get employee by employee ID (for login dashboard)
+router.get('/profile/:employeeId', auth, async (req, res) => {
+    try {
+        let employee;
+        
+        if (req.user.role === 'admin') {
+            employee = await Employee.findOne({ employeeId: req.params.employeeId }).select('-password');
+        } else {
+            // Employee can only view their own data
+            if (req.user.employeeId !== req.params.employeeId) {
+                return res.status(403).json({ message: 'Access denied' });
+            }
+            employee = await Employee.findOne({ employeeId: req.params.employeeId }).select('-password');
+        }
+
+        if (!employee) {
+            return res.status(404).json({ message: 'Employee not found' });
+        }
+
+        // Recalculate experience for real-time data
+        employee.recalculateExperience();
+        await employee.save();
+
+        res.json(employee);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
     }
-
-    const {
-      employeeId,
-      fullName,
-      designation,
-      qualifications,
-      dateOfBirth,
-      dateOfJoining,
-      previousExperience
-    } = req.body;
-
-    // Check if employee ID already exists
-    let existingEmployee = await Employee.findOne({ employeeId });
-    if (existingEmployee) {
-      return res.status(400).json({ message: 'Employee ID already exists' });
-    }
-
-    // Validate dates
-    const dob = new Date(dateOfBirth);
-    const doj = new Date(dateOfJoining);
-    const today = new Date();
-
-    if (dob >= today) {
-      return res.status(400).json({ message: 'Date of birth must be in the past' });
-    }
-
-    if (doj > today) {
-      return res.status(400).json({ message: 'Date of joining cannot be in the future' });
-    }
-
-    if (dob >= doj) {
-      return res.status(400).json({ message: 'Date of birth must be before date of joining' });
-    }
-
-    // Create employee
-    const employee = new Employee({
-      employeeId,
-      fullName,
-      designation,
-      qualifications: qualifications || {},
-      dateOfBirth: dob,
-      dateOfJoining: doj,
-      previousExperience: previousExperience || { years: 0, months: 0, days: 0 },
-      createdBy: req.user._id
-    });
-
-    await employee.save();
-    await employee.populate('createdBy', 'username');
-
-    res.status(201).json(employee);
-  } catch (error) {
-    console.error(error);
-    if (error.code === 11000) {
-      return res.status(400).json({ message: 'Employee ID already exists' });
-    }
-    res.status(500).json({ message: 'Server error' });
-  }
 });
 
-// @route   PUT /api/employees/:id
-// @desc    Update employee
-// @access  Private
-router.put('/:id', [
-  auth,
-  body('employeeId').optional().notEmpty().withMessage('Employee ID cannot be empty'),
-  body('fullName').optional().notEmpty().withMessage('Full name cannot be empty'),
-  body('designation').optional().notEmpty().withMessage('Designation cannot be empty'),
-  body('dateOfBirth').optional().isISO8601().withMessage('Valid date of birth is required'),
-  body('dateOfJoining').optional().isISO8601().withMessage('Valid date of joining is required')
-], async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
+// Get employee by email (for login dashboard)
+router.get('/profile/email/:email', auth, async (req, res) => {
+    try {
+        let employee;
+        
+        if (req.user.role === 'admin') {
+            employee = await Employee.findOne({ email: req.params.email.toLowerCase() }).select('-password');
+        } else {
+            // Employee can only view their own data
+            if (req.user.email !== req.params.email.toLowerCase()) {
+                return res.status(403).json({ message: 'Access denied' });
+            }
+            employee = await Employee.findOne({ email: req.params.email.toLowerCase() }).select('-password');
+        }
+
+        if (!employee) {
+            return res.status(404).json({ message: 'Employee not found' });
+        }
+
+        // Recalculate experience for real-time data
+        employee.recalculateExperience();
+        await employee.save();
+
+        res.json(employee);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
     }
-
-    let employee = await Employee.findById(req.params.id);
-    if (!employee) {
-      return res.status(404).json({ message: 'Employee not found' });
-    }
-
-    const {
-      employeeId,
-      fullName,
-      designation,
-      qualifications,
-      dateOfBirth,
-      dateOfJoining,
-      previousExperience
-    } = req.body;
-
-    // Check if new employee ID conflicts with existing one
-    if (employeeId && employeeId !== employee.employeeId) {
-      const existingEmployee = await Employee.findOne({ employeeId });
-      if (existingEmployee) {
-        return res.status(400).json({ message: 'Employee ID already exists' });
-      }
-    }
-
-    // Validate dates if provided
-    if (dateOfBirth || dateOfJoining) {
-      const dob = dateOfBirth ? new Date(dateOfBirth) : employee.dateOfBirth;
-      const doj = dateOfJoining ? new Date(dateOfJoining) : employee.dateOfJoining;
-      const today = new Date();
-
-      if (dob >= today) {
-        return res.status(400).json({ message: 'Date of birth must be in the past' });
-      }
-
-      if (doj > today) {
-        return res.status(400).json({ message: 'Date of joining cannot be in the future' });
-      }
-
-      if (dob >= doj) {
-        return res.status(400).json({ message: 'Date of birth must be before date of joining' });
-      }
-    }
-
-    // Update fields
-    if (employeeId) employee.employeeId = employeeId;
-    if (fullName) employee.fullName = fullName;
-    if (designation) employee.designation = designation;
-    if (qualifications) employee.qualifications = { ...employee.qualifications, ...qualifications };
-    if (dateOfBirth) employee.dateOfBirth = new Date(dateOfBirth);
-    if (dateOfJoining) employee.dateOfJoining = new Date(dateOfJoining);
-    if (previousExperience) {
-      employee.previousExperience = {
-        years: previousExperience.years || 0,
-        months: previousExperience.months || 0,
-        days: previousExperience.days || 0
-      };
-    }
-
-    await employee.save();
-    await employee.populate('createdBy', 'username');
-
-    res.json(employee);
-  } catch (error) {
-    console.error(error);
-    if (error.kind === 'ObjectId') {
-      return res.status(404).json({ message: 'Employee not found' });
-    }
-    if (error.code === 11000) {
-      return res.status(400).json({ message: 'Employee ID already exists' });
-    }
-    res.status(500).json({ message: 'Server error' });
-  }
 });
 
-// @route   DELETE /api/employees/:id
-// @desc    Delete employee
-// @access  Private
+// Update employee (Admin only or employee updating their own non-sensitive data)
+router.put('/:id', auth, async (req, res) => {
+    try {
+        let employee = await Employee.findById(req.params.id);
+        
+        if (!employee) {
+            return res.status(404).json({ message: 'Employee not found' });
+        }        // Check permissions
+        if (req.user.role !== 'admin' && req.user.email !== employee.email) {
+            return res.status(403).json({ message: 'Access denied' });
+        }
+
+        const {
+            fullName,
+            designation,
+            ugQualification,
+            pgQualification,
+            phdQualification,
+            dateOfBirth,
+            dateOfJoining,
+            previousExperience,
+            profilePhoto
+        } = req.body;        // Update fields
+        if (fullName) employee.fullName = fullName;
+        if (designation) employee.designation = designation;
+        if (ugQualification !== undefined) employee.ugQualification = ugQualification;
+        if (pgQualification !== undefined) employee.pgQualification = pgQualification;
+        if (phdQualification !== undefined) employee.phdQualification = phdQualification;
+        if (dateOfBirth) employee.dateOfBirth = new Date(dateOfBirth);
+        if (dateOfJoining) employee.dateOfJoining = new Date(dateOfJoining);
+        if (previousExperience) employee.previousExperience = previousExperience;
+        if (profilePhoto !== undefined) employee.profilePhoto = profilePhoto;
+
+        await employee.save();
+
+        // Return updated employee without password
+        const updatedEmployee = await Employee.findById(req.params.id).select('-password');
+        res.json(updatedEmployee);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Delete employee (Admin only)
 router.delete('/:id', auth, async (req, res) => {
-  try {
-    const employee = await Employee.findById(req.params.id);
-    if (!employee) {
-      return res.status(404).json({ message: 'Employee not found' });
-    }
+    try {
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ message: 'Access denied' });
+        }
 
-    await Employee.findByIdAndDelete(req.params.id);
-    res.json({ message: 'Employee deleted successfully' });
-  } catch (error) {
-    console.error(error);
-    if (error.kind === 'ObjectId') {
-      return res.status(404).json({ message: 'Employee not found' });
-    }
-    res.status(500).json({ message: 'Server error' });
-  }
-});
+        const employee = await Employee.findById(req.params.id);
+        
+        if (!employee) {
+            return res.status(404).json({ message: 'Employee not found' });
+        }
 
-// @route   GET /api/employees/:id/experience
-// @desc    Get real-time experience calculations for an employee
-// @access  Private
-router.get('/:id/experience', auth, async (req, res) => {
-  try {
-    const employee = await Employee.findById(req.params.id);
-    if (!employee) {
-      return res.status(404).json({ message: 'Employee not found' });
+        await Employee.findByIdAndDelete(req.params.id);
+        res.json({ message: 'Employee deleted successfully' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
     }
-
-    res.json({
-      age: employee.age,
-      currentExperience: employee.currentExperience,
-      totalExperience: employee.totalExperience,
-      lastCalculated: new Date()
-    });
-  } catch (error) {
-    console.error(error);
-    if (error.kind === 'ObjectId') {
-      return res.status(404).json({ message: 'Employee not found' });
-    }
-    res.status(500).json({ message: 'Server error' });
-  }
 });
 
 module.exports = router;
